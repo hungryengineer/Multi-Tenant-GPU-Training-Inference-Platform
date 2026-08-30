@@ -19,11 +19,18 @@ spec:
               env:
                 - name: OUTPUT_DIR
                   value: "/app/output/lora-adapter"
+              volumeMounts:
+                - mountPath: /app/output
+                  name: checkpoint-vol
               resources:
                 requests:
                   cpu: "1"
                 limits:
                   cpu: "1"
+          volumes:
+            - name: checkpoint-vol
+              persistentVolumeClaim:
+                claimName: qlora-checkpoints
 
     workerGroupSpecs:
       - groupName: worker
@@ -38,6 +45,13 @@ spec:
                 env:
                   - name: OUTPUT_DIR
                     value: "/app/output/lora-adapter"
+                volumeMounts:
+                  - mountPath: /app/output
+                    name: checkpoint-vol
                 resources:
                   limits:
                     nvidia.com/gpu: "1"
+            volumes:
+              - name: checkpoint-vol
+                persistentVolumeClaim:
+                  claimName: qlora-checkpoints

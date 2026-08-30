@@ -3,6 +3,28 @@
 ## Project Goal
 To build a highly optimized, multi-tenant Kubernetes architecture using **KubeRay** and **Kueue** capable of scheduling and executing distributed GPU workloads. The initial objective was to successfully containerize and deploy a Qwen-0.5B QLoRA fine-tuning workflow (using Unsloth) as a KubeRay `RayJob` on a local K3s cluster.
 
+## Architecture
+
+```text
+                         K3s
+                          │
+              ┌───────────┴───────────┐
+              │                       │
+           TRAINING                INFERENCE
+              │                       │
+           Kueue                     ┌┴────────────┐
+              │                       │             │
+            RayJob              Gateway/EPP       llm-d
+              │                       │             │
+            QLoRA                     └──────┬──────┘
+              │                              │
+        LoRA artifacts                     vLLM
+              │                              │
+              └──────────────────────→  Multi-LoRA
+                                             │
+                                           GPU
+```
+
 ---
 
 ## Installation Sequence

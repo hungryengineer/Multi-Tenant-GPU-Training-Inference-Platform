@@ -1,4 +1,8 @@
+import glob
 import os
+import signal
+import sys
+
 from datasets import load_dataset
 from unsloth import FastLanguageModel
 from transformers import TrainingArguments
@@ -15,8 +19,51 @@ OUTPUT_DIR = os.getenv(
     "/app/output/lora-adapter",
 )
 
+SAVE_STEPS = int(os.getenv("SAVE_STEPS", "50"))
+
+
+def find_latest_checkpoint(output_dir: str) -> str | None:
+    """Return the newest valid HF checkpoint dir, or None for a fresh run."""
+    explicit = os.getenv("RESUME_FROM")
+    if explicit:
+        if os.path.isdir(explicit) and os.path.isfile(
+            os.path.join(explicit, "trainer_state.json")
+        ):
+            return explicit
+        raise FileNotFoundError(
+            f"RESUME_FROM={explicit!r} is missing or has no trainer_state.json"
+        )
+
+    checkpoints: list[tuple[int, str]] = []
+    for path in glob.glob(os.path.join(output_dir, "checkpoint-*")):
+        suffix = os.path.basename(path).rsplit("-", 1)[-1]
+        if not suffix.isdigit():
+            continue
+        if os.path.isfile(os.path.join(path, "trainer_state.json")):
+            checkpoints.append((int(suffix), path))
+
+    if not checkpoints:
+        return None
+    return max(checkpoints, key=lambda item: item[0])[1]
+
+
+def register_preemption_handler(trainer) -> None:
+    """Save a checkpoint when Kueue/Kubernetes sends SIGTERM before killing the pod."""
+
+    def handle_preemption(signum, _frame):
+        sig_name = signal.Signals(signum).name
+        print(f"Received {sig_name}, saving emergency checkpoint...", flush=True)
+        trainer._save_checkpoint(trainer.model, trial=None)
+        sys.exit(128 + signum)
+
+    signal.signal(signal.SIGTERM, handle_preemption)
+    signal.signal(signal.SIGINT, handle_preemption)
+
 
 def main():
+    resume_from = find_latest_checkpoint(OUTPUT_DIR)
+    print(f"RESUME_FROM={resume_from}", flush=True)
+
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=MODEL_NAME,
         max_seq_length=1024,
@@ -71,14 +118,16 @@ def main():
             num_train_epochs=1,
             learning_rate=2e-4,
             logging_steps=5,
-            save_steps=50,
+            save_steps=SAVE_STEPS,
+            save_total_limit=3,
             fp16=False,
             bf16=True,
             report_to="none",
         ),
     )
 
-    trainer.train()
+    register_preemption_handler(trainer)
+    trainer.train(resume_from_checkpoint=resume_from)
     trainer.save_model(OUTPUT_DIR)
 
 
