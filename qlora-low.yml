@@ -1,11 +1,11 @@
 apiVersion: ray.io/v1
 kind: RayJob
 metadata:
-  name: qlora-test-hp
+  name: qlora-test-lp
   namespace: default
   labels:
     kueue.x-k8s.io/queue-name: team-a
-    kueue.x-k8s.io/priority-class: high-priority
+    kueue.x-k8s.io/priority-class: low-priority
 spec:
   entrypoint: "env OUTPUT_DIR=/app/output/lora-adapter uv run --frozen python /app/train_qlora.py"
   shutdownAfterJobFinishes: true

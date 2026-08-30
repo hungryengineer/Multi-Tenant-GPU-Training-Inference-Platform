@@ -11,6 +11,8 @@ spec:
   namespaceSelector:
     matchLabels:
       kueue-enabled: "true"
+  preemption:
+    withinClusterQueue: LowerPriority
   resourceGroups:
   - coveredResources:
       - cpu
