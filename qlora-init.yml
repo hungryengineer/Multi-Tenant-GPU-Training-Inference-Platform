@@ -1,0 +1,43 @@
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: qlora-test
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: team-a
+spec:
+  entrypoint: "env OUTPUT_DIR=/app/output/lora-adapter uv run --frozen python /app/train_qlora.py"
+  shutdownAfterJobFinishes: true
+  rayClusterSpec:
+    headGroupSpec:
+      rayStartParams: {}
+      template:
+        spec:
+          containers:
+            - name: ray-head
+              image: mt-gpu-training-ray:dev
+              env:
+                - name: OUTPUT_DIR
+                  value: "/app/output/lora-adapter"
+              resources:
+                requests:
+                  cpu: "1"
+                limits:
+                  cpu: "1"
+
+    workerGroupSpecs:
+      - groupName: worker
+        replicas: 1
+        rayStartParams: {}
+        template:
+          spec:
+            containers:
+              - name: ray-worker
+                image: mt-gpu-training-ray:dev
+                imagePullPolicy: IfNotPresent
+                env:
+                  - name: OUTPUT_DIR
+                    value: "/app/output/lora-adapter"
+                resources:
+                  limits:
+                    nvidia.com/gpu: "1"

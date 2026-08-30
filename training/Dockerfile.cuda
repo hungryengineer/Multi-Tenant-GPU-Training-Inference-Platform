@@ -1,0 +1,22 @@
+FROM nvidia/cuda:12.8.1-runtime-ubuntu24.04
+
+WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3.12 \
+        python3.12-venv \
+        curl \
+        build-essential \
+        git && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+
+COPY pyproject.toml uv.lock ./
+ENV UV_LINK_MODE=copy
+RUN uv sync --frozen
+
+COPY train_qlora.py ./
+
+CMD ["uv", "run", "--frozen", "python", "train_qlora.py"]

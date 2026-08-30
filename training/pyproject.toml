@@ -1,0 +1,19 @@
+[project]
+name = "training"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "hungryengineer", email = "noemail@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "datasets>=4.3.0",
+    "peft>=0.20.0",
+    "transformers>=5.5.0",
+    "trl>=0.24.0",
+    "unsloth>=2026.8.22",
+]
+
+[tool.uv]
+package = false
