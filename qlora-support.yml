@@ -1,0 +1,83 @@
+apiVersion: ray.io/v1
+kind: RayJob
+
+metadata:
+  name: qlora-support
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: team-a
+
+spec:
+  entrypoint: >-
+    env
+    DATASET_PATH=/app/data/support.jsonl
+    OUTPUT_DIR=/app/output/support-adapter
+    uv run --frozen python /app/train_qlora.py
+
+  shutdownAfterJobFinishes: true
+
+  rayClusterSpec:
+
+    headGroupSpec:
+      rayStartParams: {}
+
+      template:
+        spec:
+          containers:
+            - name: ray-head
+              image: mt-gpu-training-ray:dev
+              imagePullPolicy: IfNotPresent
+
+              env:
+                - name: DATASET_PATH
+                  value: "/app/data/support.jsonl"
+
+                - name: OUTPUT_DIR
+                  value: "/app/output/support-adapter"
+
+              volumeMounts:
+                - name: checkpoint-vol
+                  mountPath: /app/output
+
+              resources:
+                requests:
+                  cpu: "1"
+                limits:
+                  cpu: "1"
+
+          volumes:
+            - name: checkpoint-vol
+              persistentVolumeClaim:
+                claimName: qlora-checkpoints
+
+    workerGroupSpecs:
+      - groupName: worker
+        replicas: 1
+        rayStartParams: {}
+
+        template:
+          spec:
+            containers:
+              - name: ray-worker
+                image: mt-gpu-training-ray:dev
+                imagePullPolicy: IfNotPresent
+
+                env:
+                  - name: DATASET_PATH
+                    value: "/app/data/support.jsonl"
+
+                  - name: OUTPUT_DIR
+                    value: "/app/output/support-adapter"
+
+                volumeMounts:
+                  - name: checkpoint-vol
+                    mountPath: /app/output
+
+                resources:
+                  limits:
+                    nvidia.com/gpu: "1"
+
+            volumes:
+              - name: checkpoint-vol
+                persistentVolumeClaim:
+                  claimName: qlora-checkpoints

@@ -11,10 +11,11 @@ USER ray
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
-COPY --chown=ray:users pyproject.toml uv.lock ./
+COPY --chown=ray:users training/pyproject.toml training/uv.lock ./
 ENV UV_LINK_MODE=copy
 RUN uv sync --frozen
 
-COPY --chown=ray:users train_qlora.py /app/train_qlora.py
+COPY training/data /app/data
+COPY --chown=ray:users training/train_qlora.py /app/train_qlora.py
 
 CMD ["uv", "run", "--frozen", "python", "/app/train_qlora.py"]

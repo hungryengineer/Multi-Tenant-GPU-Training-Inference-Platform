@@ -1,0 +1,8 @@
+.venv
+.git
+__pycache__
+*.pyc
+output
+unsloth_compiled_cache
+training/.venv
+training/unsloth_compiled_cache

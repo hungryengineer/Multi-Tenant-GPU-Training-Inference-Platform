@@ -89,10 +89,27 @@ def main():
         random_state=3407,
     )
 
-    dataset = load_dataset(
-        "yahma/alpaca-cleaned",
-        split="train[:500]",
+    DATASET_PATH = os.getenv(
+    "DATASET_PATH",
+    "yahma/alpaca-cleaned",
     )
+
+    DATASET_SPLIT = os.getenv(
+        "DATASET_SPLIT",
+        "train[:500]",
+    )
+
+    if DATASET_PATH.endswith(".jsonl"):
+        dataset = load_dataset(
+            "json",
+            data_files=DATASET_PATH,
+            split="train",
+        )
+    else:
+        dataset = load_dataset(
+            DATASET_PATH,
+            split=DATASET_SPLIT,
+        )
 
     def format_example(example):
         return (
