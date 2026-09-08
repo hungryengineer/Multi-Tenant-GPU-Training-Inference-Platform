@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sglang
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sglang
+  template:
+    metadata:
+      labels:
+        app: sglang
+    spec:
+      containers:
+      - name: sglang
+        image: docker.io/lmsysorg/sglang:v0.5.12
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          python3 -m sglang.launch_server \
+            --model-path Qwen/Qwen2.5-0.5B-Instruct \
+            --host 0.0.0.0 \
+            --port 30000 \
+            --tp 1 \
+            --enable-metrics
+        ports:
+        - containerPort: 30000
+        resources:
+          requests:
+            nvidia.com/gpu: 1
+          limits:
+            nvidia.com/gpu: 1
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 30000
+          failureThreshold: 120
+          periodSeconds: 10
+          timeoutSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sglang
+spec:
+  selector:
+    app: sglang
+  ports:
+  - port: 30000
+    targetPort: 30000

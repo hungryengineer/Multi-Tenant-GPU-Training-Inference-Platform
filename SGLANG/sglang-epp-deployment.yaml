@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sglang-epp-epp
+  namespace: default
+  labels:
+    app.kubernetes.io/name: sglang-epp-epp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sglang-epp
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: sglang-epp
+    spec:
+      serviceAccountName: sglang-epp-epp
+      containers:
+      - name: epp
+        image: ghcr.io/llm-d/llm-d-router-endpoint-picker:main
+        imagePullPolicy: Always
+        args:
+        - --pool-name
+        - sglang-pool
+        - --pool-namespace
+        - default
+        - --pool-group
+        - inference.networking.k8s.io
+        - --zap-encoder
+        - json
+        - --config-file
+        - /etc/epp/config.yaml
+        - --grpc-port
+        - "9002"
+        - --grpc-health-port
+        - "9003"
+        - --tracing=false
+        - --secure-serving=true
+        - --emit-endpoint-scores=true
+        - --v=4
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        ports:
+        - name: grpc
+          containerPort: 9002
+        - name: grpc-health
+          containerPort: 9003
+        - name: metrics
+          containerPort: 9090
+        livenessProbe:
+          failureThreshold: 3
+          grpc:
+            port: 9003
+            service: inference-extension
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        readinessProbe:
+          failureThreshold: 3
+          grpc:
+            port: 9003
+            service: inference-extension
+          periodSeconds: 2
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          requests:
+            cpu: 500m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/epp
+      volumes:
+      - name: config
+        configMap:
+          name: sglang-epp-config
+      terminationGracePeriodSeconds: 130

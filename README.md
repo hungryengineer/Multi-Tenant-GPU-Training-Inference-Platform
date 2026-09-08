@@ -43,11 +43,47 @@ The training pipeline handles job queuing and distributed GPU execution.
 * **Unsloth** runs inside the Ray Worker, applying 2x faster bfloat16 LoRA patching to models like `Qwen-0.5B`.
 * **Artifacts** are streamed into a `local-path` Persistent Volume Claim (PVC), allowing checkpoints to persist even if pods are preempted.
 
-### 2. The Inference Pipeline (vLLM + Envoy Gateway)
+### 2. The Inference Pipeline (vLLM + SGLang + Envoy Gateway)
 *Once training completes, the pipeline transitions to inference.*
 * **Gateway API (EPP/Envoy)** routes incoming tenant REST requests to the correct model.
 * **vLLM** loads the singular base model into GPU memory. 
 * As requests arrive for different fine-tuned tasks, vLLM dynamically fetches the corresponding LoRA adapters generated from the training phase, injecting them on-the-fly with near-zero latency overhead.
+
+### 3. SGLang Inference (dedicated gateway + EPP)
+SGLang runs as a second, fully isolated inference stack with its own dedicated Gateway, Endpoint Picker (EPP), and InferencePool — independent of the vLLM stack.
+
+```bash
+kubectl apply -f SGLANG/
+```
+
+Manifests in `SGLANG/`:
+
+| File                    | Purpose                                                        |
+|-------------------------|----------------------------------------------------------------|
+| `sglang.yml`            | SGLang server Deployment (`Qwen/Qwen2.5-0.5B-Instruct`, port 30000) + ClusterIP Service |
+| `sglang-pool.yaml`      | `InferencePool` selecting `app=sglang` pods, EPP `sglang-epp-epp:9002`, FailOpen |
+| `sglang-epp-rbac.yaml`  | ServiceAccount + Roles for the EPP (pods, inferencepools, inferenceobjectives, inferencemodelrewrites) |
+| `sglang-epp-config.yaml`| EPP `llm-d.ai/v1alpha1 EndpointPickerConfig` (queue/kv-cache/prefix-cache scorers, metrics source) |
+| `sglang-epp-deployment.yaml` | EPP Deployment (secure-serving, gRPC health on 9003, metrics on 9090, probes) |
+| `sglang-epp-service.yaml` | EPP ClusterIP Service (`9002` h2c ext-proc, `9090` metrics) |
+| `sglang-gateway.yaml`   | Dedicated `envoy gateway` Gateway at `192.168.1.37:8001` (port 8001 avoids the vLLM gateway's host-port 8000 on this single node) |
+| `sglang-httproute.yaml` | HTTPRoute → `sglang-pool` (this is what makes ai-gateway-controller reconcile the pool and wire extProc) |
+
+Verify:
+
+```bash
+kubectl get gateway sglang-gateway   # Programmed, address 192.168.1.37
+kubectl get httproute sglang-route    # Accepted / ResolvedRefs
+kubectl get inferencepool sglang-pool # Accepted (sglang-route is the trigger)
+kubectl get deploy sglang-epp-epp     # 1/1 Running (ext-proc 9002, health 9003)
+```
+
+Test once the server pod is up:
+
+```bash
+curl http://192.168.1.37:8001/v1/chat/completions -H 'Content-Type: application/json' \
+  -d '{"model":"Qwen/Qwen2.5-0.5B-Instruct","messages":[{"role":"user","content":"Hello"}],"max_tokens":10}'
+```
 
 ---
 
