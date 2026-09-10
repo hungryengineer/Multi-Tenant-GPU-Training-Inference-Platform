@@ -1,0 +1,53 @@
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: rayservice-demo
+  namespace: default
+
+spec:
+  rayClusterConfig:
+    rayVersion: "2.46.0"
+
+    headGroupSpec:
+      rayStartParams:
+        dashboard-host: "0.0.0.0"
+      template:
+        spec:
+          containers:
+          - name: ray-head
+            image: rayproject/ray:2.46.0
+            resources:
+              requests:
+                cpu: "1"
+                memory: "1Gi"
+              limits:
+                cpu: "2"
+                memory: "2Gi"
+
+    workerGroupSpecs:
+    - groupName: cpu-workers
+      replicas: 1
+      minReplicas: 1
+      maxReplicas: 1
+
+      template:
+        spec:
+          containers:
+          - name: ray-worker
+            image: rayproject/ray:2.46.0
+            resources:
+              requests:
+                cpu: "1"
+                memory: "1Gi"
+              limits:
+                cpu: "2"
+                memory: "2Gi"
+
+  serveConfigV2: |
+    applications:
+      - name: demo
+        import_path: ray.serve:app
+        route_prefix: /
+        deployments:
+          - name: Demo
+            num_replicas: 1

@@ -1,0 +1,59 @@
+apiVersion: serving.kserve.io/v1alpha1
+kind: LLMInferenceService
+metadata:
+  name: qwen-llm
+  namespace: default
+
+spec:
+  storageInitializer:
+    enabled: false
+
+  model:
+    uri: hf://Qwen/Qwen2.5-0.5B-Instruct
+    name: qwen
+
+  replicas: 1
+
+  template:
+    volumes:
+    - name: model-host
+      hostPath:
+        path: /var/lib/qwen2.5-0.5b-instruct
+    - name: vllm-cache
+      hostPath:
+        path: /var/lib/vllm-cache
+    containers:
+    - name: main
+      image: vllm/vllm-openai:v0.27.1
+      args:
+      - "--max-model-len"
+      - "2048"
+      - "--tensor-parallel-size"
+      - "1"
+      - "--gpu-memory-utilization"
+      - "0.40"
+      - "--no-enable-flashinfer-autotune"
+      - "--enforce-eager"
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1400Mi"
+          nvidia.com/gpu: "1"
+        limits:
+          cpu: "2"
+          memory: "8Gi"
+          nvidia.com/gpu: "1"
+      volumeMounts:
+      - name: model-host
+        mountPath: /mnt/models
+        readOnly: true
+      - name: vllm-cache
+        mountPath: /home/.cache
+
+  router:
+    gateway:
+      refs: []
+    route:
+      http: {}
+    scheduler:
+      pool: {}

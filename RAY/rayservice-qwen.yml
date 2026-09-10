@@ -1,0 +1,97 @@
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: ray-qwen
+  namespace: default
+
+spec:
+  rayClusterConfig:
+    rayVersion: "2.52.0"
+
+    headGroupSpec:
+      rayStartParams:
+        num-cpus: "4"
+        dashboard-host: "0.0.0.0"
+
+      template:
+        spec:
+          containers:
+          - name: ray-head
+            image: rayproject/ray-llm:2.52.0-py311-cu128
+            imagePullPolicy: Never
+            env:
+            - name: RAY_memory_monitor_refresh_ms
+              value: "0"
+            - name: RAY_memory_usage_threshold
+              value: "1.0"
+            volumeMounts:
+            - name: hf-cache
+              mountPath: /home/ray/.cache/huggingface
+            resources:
+              requests:
+                cpu: "1"
+                memory: "4Gi"
+              limits:
+                cpu: "1"
+                memory: "5Gi"
+          volumes:
+          - name: hf-cache
+            hostPath:
+              path: /var/lib/ray-hf-cache/huggingface
+
+    workerGroupSpecs:
+    - groupName: gpu-workers
+      rayStartParams:
+        num-cpus: "4"
+      replicas: 1
+      minReplicas: 1
+      maxReplicas: 1
+
+      template:
+        spec:
+          containers:
+          - name: ray-worker
+            image: rayproject/ray-llm:2.52.0-py311-cu128
+            imagePullPolicy: Never
+            env:
+            - name: RAY_memory_monitor_refresh_ms
+              value: "0"
+            - name: RAY_memory_usage_threshold
+              value: "1.0"
+            volumeMounts:
+            - name: hf-cache
+              mountPath: /home/ray/.cache/huggingface
+            resources:
+              requests:
+                cpu: "2"
+                memory: "6Gi"
+                nvidia.com/gpu: "1"
+              limits:
+                cpu: "2"
+                memory: "9Gi"
+                nvidia.com/gpu: "1"
+          volumes:
+          - name: hf-cache
+            hostPath:
+              path: /var/lib/ray-hf-cache/huggingface
+
+  serveConfigV2: |
+    applications:
+    - name: qwen
+      import_path: ray.serve.llm:build_openai_app
+      route_prefix: "/"
+      args:
+        llm_configs:
+        - model_loading_config:
+            model_id: qwen-0.5b
+            model_source: Qwen/Qwen2.5-0.5B-Instruct
+
+          engine_kwargs:
+            tensor_parallel_size: 1
+            max_model_len: 2048
+            gpu_memory_utilization: 0.38
+
+          deployment_config:
+            autoscaling_config:
+              min_replicas: 1
+              max_replicas: 1
