@@ -6,3 +6,7 @@ __pycache__/
 *.pyd
 *.tar
 .DS_Store
+
+# uv
+.python-version
+uv.lock

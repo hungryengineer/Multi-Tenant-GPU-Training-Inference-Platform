@@ -12,7 +12,7 @@ spec:
     uri: hf://Qwen/Qwen2.5-0.5B-Instruct
     name: qwen
 
-  replicas: 1
+  replicas: 0  # temporarily scaled to 0 to free GPU memory; set to 1 to resume
 
   template:
     volumes:

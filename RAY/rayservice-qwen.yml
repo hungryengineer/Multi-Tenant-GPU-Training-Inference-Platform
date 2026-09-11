@@ -5,6 +5,7 @@ metadata:
   namespace: default
 
 spec:
+  suspend: true  # temporarily suspended to free GPU memory; set to false to resume
   rayClusterConfig:
     rayVersion: "2.52.0"
 
